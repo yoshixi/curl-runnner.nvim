@@ -6,7 +6,6 @@ local M = {}
 
 function M.setup(opts)
   config.setup(opts)
-  vim.api.nvim_exec_autocmds("User", { pattern = "CurlRunnerSetup" })
 end
 
 function M.run(cmd_str)
