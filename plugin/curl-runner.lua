@@ -1,20 +1,22 @@
--- Auto-loaded by Neovim. Registers keymaps and commands after setup() is called.
--- Users must call require("curl-runner").setup() for this to activate.
+-- Auto-loaded by Neovim. Registers keymaps and commands on VimEnter,
+-- using defaults if setup() has not been called explicitly.
 
-vim.api.nvim_create_autocmd("User", {
-  pattern = "CurlRunnerSetup",
+vim.api.nvim_create_autocmd("VimEnter", {
   once = true,
   callback = function()
-    local curl = require("curl-runner")
-    local opts = require("curl-runner.config").options
+    local config = require("curl-runner.config")
+    -- Initialize with defaults if the user never called setup()
+    if vim.tbl_isempty(config.options) then
+      config.setup({})
+    end
 
-    -- Keymap
-    local keymap = opts.keymap or "<leader>rc"
-    vim.keymap.set({ "n", "v" }, keymap, function()
+    local curl = require("curl-runner")
+    local opts = config.options
+
+    vim.keymap.set({ "n", "v" }, opts.keymap, function()
       curl.run_from_buffer()
     end, { desc = "curl-runner: run curl at cursor" })
 
-    -- :CurlRun [cmd]
     vim.api.nvim_create_user_command("CurlRun", function(o)
       if o.args ~= "" then
         curl.run(o.args)
@@ -23,13 +25,8 @@ vim.api.nvim_create_autocmd("User", {
       end
     end, { nargs = "?", desc = "Run curl command" })
 
-    -- :CurlLog
-    local log_cmd = (opts.log and opts.log.command) or "CurlLog"
-    vim.api.nvim_create_user_command(log_cmd, function()
+    vim.api.nvim_create_user_command(opts.log.command, function()
       curl.open_log()
     end, { desc = "Open curl-runner log buffer" })
   end,
 })
-
--- Fire the event after the plugin files are sourced so setup() can trigger it.
--- setup() fires this event itself; the autocmd above responds to it.
