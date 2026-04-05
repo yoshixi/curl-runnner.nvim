@@ -60,15 +60,37 @@ function M.run(cmd_str, config)
     end
   end
 
+  local stdout_data = {}
+  local stderr_data = {}
+
   vim.fn.jobstart(cmd_str, {
     stdout_buffered = true,
     stderr_buffered = true,
 
     on_stdout = function(_, data)
+      stdout_data = data
+    end,
+
+    on_stderr = function(_, data)
+      stderr_data = data
+    end,
+
+    on_exit = function(_, exit_code)
       vim.schedule(function()
         close_loading()
 
-        local raw_output = table.concat(data, "\n")
+        local raw_output = table.concat(stdout_data, "\n")
+
+        if exit_code ~= 0 or raw_output:gsub("%s+", "") == "" then
+          local msg = table.concat(stderr_data, "\n"):gsub("^%s+", ""):gsub("%s+$", "")
+          if msg ~= "" then
+            window.open_float(vim.split(msg, "\n"), "curl — error", win_opts)
+            if config.log and config.log.enabled ~= false then
+              log.record(cmd_str, "ERROR:\n" .. msg)
+            end
+          end
+          return
+        end
 
         -- Split on the first blank line separating headers from body
         local header_part, body_part = raw_output:match("^(.-)\r?\n\r?\n(.*)$")
@@ -106,19 +128,6 @@ function M.run(cmd_str, config)
         -- Write to log buffer
         if config.log and config.log.enabled ~= false then
           log.record(cmd_str, raw_output)
-        end
-      end)
-    end,
-
-    on_stderr = function(_, data)
-      vim.schedule(function()
-        close_loading()
-        local msg = table.concat(data, "\n"):gsub("^%s+", ""):gsub("%s+$", "")
-        if msg ~= "" then
-          window.open_float(vim.split(msg, "\n"), "curl — error", win_opts)
-          if config.log and config.log.enabled ~= false then
-            log.record(cmd_str, "ERROR:\n" .. msg)
-          end
         end
       end)
     end,
